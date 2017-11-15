@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import datetime, sys, re, urllib2, logging
-#from pushnotify import abstract, get_client, exceptions, pushover
 import pushnotify
 from bs4 import BeautifulSoup
 
@@ -28,7 +27,7 @@ class Advisory:
         self.date = datetime.datetime.strptime(html.td.text, '%d.%m.%y').date()
         self.risk = int(html.find('span', {'class': re.compile('search-result-crit-*')}).text)
         self.identifier = html.find('a', {'class': 'search-result-link'}).text
-        self.link = 'https://www.cert-bund.de/overview/' + html.find('a', {'class': 'search-result-link'})['href']
+        self.link = 'https://www.cert-bund.de/' + html.find('a', {'class': 'search-result-link'})['href']
         self.description = html.find_all('a', {'class': 'search-result-link'})[1].text 
     def debug(self):
         print('date: '+ self.date.isoformat())
@@ -39,7 +38,7 @@ class Advisory:
 
 def startLogger():
     logger = logging.getLogger('pushnotify')
-    logger.setLevel(logging.DEBUG)F
+    logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(name)s-%(levelname)s: %(message)s')
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
