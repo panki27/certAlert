@@ -1,8 +1,6 @@
 #!/bin/env/python
-import datetime
+import datetime, sys, re, urllib2
 from bs4 import BeautifulSoup
-import re
-import urllib2
 
 TARGET_URL = 'https://www.cert-bund.de/overview/AdvisoryShort'
 MEMORY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\certAlert\out.txt'
@@ -22,8 +20,12 @@ class Advisory:
         print('desc: ' + self.description)
         print('link: ' + self.link)
 
-
-response = urllib2.urlopen(TARGET_URL)
+try:
+    response = urllib2.urlopen(TARGET_URL)
+except:
+    e = sys.exc_info()[0]
+    print('Error getting Webpage!\r\n' + e)
+    sys.exit('Stopping execution!')
 html = response.read()
 soup = BeautifulSoup(html, 'html.parser')
 
@@ -31,10 +33,18 @@ results = []
 for adv in soup.find_all('tr', {'class' : re.compile('search-result-*')}):
     x = Advisory(adv)
     results.append(x)
-
-with open(MEMORY_PATH, 'r') as memFile:
-    checkedIDs = memFile.read() 
-    memFile.close()
+try:
+    with open(MEMORY_PATH, 'r') as memFile:
+        checkedIDs = memFile.read() 
+        memFile.close()
+except IOError:
+    print('Error reading memory file!')
+    print('Continuing without list of checked IDs...')
+    checkedIDs = ''
+except:
+    e = sys.exc_info()[0]
+    print('An unknown error occured!')
+    print(e)
 for result in results:
     if result.risk > 3:
         for prog in PROGRAMS:
@@ -48,7 +58,3 @@ with open(MEMORY_PATH, 'w') as memFile:
     for result in results:
         memFile.write(result.identifier + '\r\n')
     memFile.close()
-
-
-
-#print(soup.prettify())
