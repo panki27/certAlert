@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 import datetime, sys, re, urllib2, logging
-import pushnotify
+#before running this you might want to export PYTHONIOENCODING=UTF-8
 #TODO: replace pushnotify with a simple HTTP_POST
 from bs4 import BeautifulSoup
+from pyfcm import FCMNotification
+
 
 ERRSTR = '!!!!!!!!!!!!! '
-
-
-
 
 # REMEMBER TO CHANGE THESE!!!
 TARGET_URL = 'https://www.cert-bund.de/overview/AdvisoryShort'
@@ -16,17 +15,21 @@ MEMORY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\certAlert\out.txt'
 #TODO: Put all this in a single file
 USER_KEY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\pushover_user'
 API_KEY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\pushover_key'
-PUSHOVER_DEVICE = 'chromehome'
+REG_KEYS_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\device_list'
+
 
 # To monitor more programs, simply add a string here
-PROGRAMS = [u'Chrome', u'OpenSSH', u'Java', u'Linux', u'Apache', u'Windows']
+PROGRAMS = [u'Git', u'Chrome', u'OpenSSH', u'Java', u'Linux', u'Apache', u'Windows']
 
 with open(USER_KEY_PATH, 'r') as userKeyFile:
-        USER_KEY = userKeyFile.read()
-        userKeyFile.close()
+    USER_KEY = userKeyFile.read()
+    userKeyFile.close()
 with open(API_KEY_PATH, 'r') as apiKeyFile:
     API_KEY = apiKeyFile.read()
-    userKeyFile.close()
+    apiKeyFile.close()
+with open(REG_KEYS_PATH, 'r') as regKeyFile:
+    REG_KEYS = regKeyFile.readlines()
+    regKeyFile.close()
 
 # object to store a single cert alert
 class Advisory:
@@ -53,9 +56,10 @@ def startLogger():
     logger.addHandler(handler)
 
 def getHTML(url):
+    import urllib2
     try:
-        response = urllib2.open(url)
-    except urllib2.URLError:
+        response = urllib2.urlopen(url)
+    except URLError:
         print(ERRSTR + 'Failed getting webpage!')
         print(ERRSTR + 'Check your internet connection or TARGET_URL.')
         sys.exit(ERRSTR + 'Stopping execution!')
@@ -64,26 +68,13 @@ def getHTML(url):
         print(ERRSTR + 'Error getting Webpage!')
         print(e)
         sys.exit(ERRSTR + 'Stopping execution!')
-    result = response.read();
+    result = response.read()
     return result
    
 def main():
-    import pushnotify
-    startLogger()
-    client = pushnotify.get_client('pushover', API_KEY, 'certAlert')
-    client.add_key(USER_KEY, PUSHOVER_DEVICE)
-    #try:
-    #    response = urllib2.urlopen(TARGET_URL)
-    #except urllib2.URLError:
-    #    print(ERRSTR + 'Failed getting webpage!')
-    #    print(ERRSTR + 'Check your internet connection or TARGET_URL.')
-    #    sys.exit(ERRSTR + 'Stopping execution!')
-    #except:
-    #    e = sys.exc_info()[0]
-    #   print(ERRSTR + 'Error getting Webpage!')
-    #    print(e)
-    #    sys.exit(ERRSTR + 'Stopping execution!')
-    #html = response.read()
+    #import pushnotify
+    #startLogger()
+    client = FCMNotification(api_key=API_KEY)
     html = getHTML(TARGET_URL)
     soup = BeautifulSoup(html, 'html.parser')
     # create a list of results and add objects created with the data of each table row
@@ -111,10 +102,18 @@ def main():
         if result.risk > 3:
             # here we're checking if the is related to our programs
             for prog in PROGRAMS:
-                if re.match(prog, result.description, re.IGNORECASE):
+                if re.search(prog, result.description, re.IGNORECASE):
                     if result.identifier not in checkedIDs:
                         #this means we have found an alert that we have not seen before! lets alert the user...
-                        client.notify(result.description, result.identifier, kwargs={'priority': 1, 'url': result.link,'url_title': result.identifier});
+                        for key in REG_KEYS:
+                            print(type(key))
+                            try:
+
+                                response = client.notify_single_device(registration_id=key, message_body=result.description, message_title=result.identifier)
+                            except:
+                                e = sys.exc_info()[0]
+                                print(e)
+                                print("we fucked up!")
                         result.debug()
                         print('========================================================================')
                     else:
