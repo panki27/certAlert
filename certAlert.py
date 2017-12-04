@@ -1,10 +1,8 @@
 #!/usr/bin/env python
+# before running this you might want to export PYTHONIOENCODING=UTF-8, or add it permanently to /etc/environment
 import datetime, sys, re, urllib2, logging
-#before running this you might want to export PYTHONIOENCODING=UTF-8
-#TODO: replace pushnotify with a simple HTTP_POST
 from bs4 import BeautifulSoup
 from pyfcm import FCMNotification
-
 
 ERRSTR = '!!!!!!!!!!!!! '
 
@@ -12,28 +10,33 @@ ERRSTR = '!!!!!!!!!!!!! '
 TARGET_URL = 'https://www.cert-bund.de/overview/AdvisoryShort'
 MEMORY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\certAlert\out.txt'
 
-#TODO: Put all this in a single file
-USER_KEY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\pushover_user'
-API_KEY_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\pushover_key'
-REG_KEYS_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\device_list'
-
+KEY_FILE_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\keyfile'
 
 # To monitor more programs, simply add a string here
 PROGRAMS = [u'Git', u'Chrome', u'OpenSSH', u'Java', u'Linux', u'Apache', u'Windows']
 
-with open(USER_KEY_PATH, 'r') as userKeyFile:
-    USER_KEY = userKeyFile.read()
-    userKeyFile.close()
-with open(API_KEY_PATH, 'r') as apiKeyFile:
-    API_KEY = apiKeyFile.read()
-    apiKeyFile.close()
-with open(REG_KEYS_PATH, 'r') as regKeyFile:
-    REG_KEYS = regKeyFile.readlines()
-    regKeyFile.close()
+# this function loads our API Keys into memory from an external file specified above
+
+try:
+    with open(KEY_FILE_PATH, 'r') as keyFile:
+        contents = keyFile.readlines()
+        keyFile.close()
+except:
+    e = sys.exc_info()[0]
+    print(e)
+    print("I couldn't load your credentials. Did you specify your keyfile?")
+# extract just the text behind the equals sign
+API_KEY = contents[0].split("=",1)[1]
+USER_KEYS = contents[1].split("=",1)[1]
+# get rid of that pesky newline
+API_KEY = API_KEY.strip()
+# now we split along semicolons to get single keys in a list
+USER_KEYS = USER_KEYS.split(";")
 
 # object to store a single cert alert
 class Advisory:
     def __init__(self, html):
+        # this is the fun parts. here we 'fish' the information out of the HTML
         self.date = datetime.datetime.strptime(html.td.text, '%d.%m.%y').date()
         self.risk = int(html.find('span', {'class': re.compile('search-result-crit-*')}).text)
         self.identifier = html.find('a', {'class': 'search-result-link'}).text
@@ -48,7 +51,7 @@ class Advisory:
 
 def startLogger():
     # thanks to whoever i stole this from
-    logger = logging.getLogger('pushnotify')
+    logger = logging.getLogger('certAlert')
     logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(name)s-%(levelname)s: %(message)s')
     handler = logging.StreamHandler()
@@ -72,8 +75,8 @@ def getHTML(url):
     return result
    
 def main():
-    #import pushnotify
     #startLogger()
+    print('Getting client using ' + API_KEY)
     client = FCMNotification(api_key=API_KEY)
     html = getHTML(TARGET_URL)
     soup = BeautifulSoup(html, 'html.parser')
@@ -105,10 +108,9 @@ def main():
                 if re.search(prog, result.description, re.IGNORECASE):
                     if result.identifier not in checkedIDs:
                         #this means we have found an alert that we have not seen before! lets alert the user...
-                        for key in REG_KEYS:
-                            print(type(key))
+                        for key in USER_KEYS:
                             try:
-
+                                key = key.rstrip()
                                 response = client.notify_single_device(registration_id=key, message_body=result.description, message_title=result.identifier)
                             except:
                                 e = sys.exc_info()[0]
@@ -121,7 +123,7 @@ def main():
     # now we overwrite our memory file with the IDs we just checked
     with open(MEMORY_PATH, 'w') as memFile:
         for result in results:
-            memFile.write(result.identifier + '\r\n')
+            memFile.write(result.identifier + '\r')
         memFile.close()
 
 
