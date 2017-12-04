@@ -15,23 +15,8 @@ KEY_FILE_PATH = 'C:\Users\Panki\Desktop\Privat\Dev\keyfile'
 # To monitor more programs, simply add a string here
 PROGRAMS = [u'Git', u'Chrome', u'OpenSSH', u'Java', u'Linux', u'Apache', u'Windows']
 
-# this function loads our API Keys into memory from an external file specified above
 
-try:
-    with open(KEY_FILE_PATH, 'r') as keyFile:
-        contents = keyFile.readlines()
-        keyFile.close()
-except:
-    e = sys.exc_info()[0]
-    print(e)
-    print("I couldn't load your credentials. Did you specify your keyfile?")
-# extract just the text behind the equals sign
-API_KEY = contents[0].split("=",1)[1]
-USER_KEYS = contents[1].split("=",1)[1]
-# get rid of that pesky newline
-API_KEY = API_KEY.strip()
-# now we split along semicolons to get single keys in a list
-USER_KEYS = USER_KEYS.split(";")
+
 
 # object to store a single cert alert
 class Advisory:
@@ -73,8 +58,42 @@ def getHTML(url):
         sys.exit(ERRSTR + 'Stopping execution!')
     result = response.read()
     return result
-   
+
+def readFile(path, lines = False):
+    try:
+        with open(path, 'r') as file:
+            if(lines):
+                contents = file.readlines()
+            else:contents = file.read()
+            file.close()
+    except IOError:
+        # this most likely means file not found. this can happen during the first run
+        print(ERRSTR + 'Error reading file ' + path + '!')
+        contents = ''
+    except:
+        e = sys.exc_info()[0]
+        print('An unknown error occured!')
+        print(e)
+    finally:
+        return contents
+
 def main():
+# this loads our API keys into memory from an external file which is specified above
+    try:
+        contents = readFile(KEY_FILE_PATH, True)
+    # extract just the text behind the equals sign
+        API_KEY = contents[0].split("=",1)[1]
+        USER_KEYS = contents[1].split("=",1)[1]
+        # get rid of that pesky newline
+        API_KEY = API_KEY.strip()
+        # now we split along semicolons to get single keys in a list
+        USER_KEYS = USER_KEYS.split(";")
+    except:
+        e = sys.exc_info()[0]
+        print(e)
+        print(ERRSTR + "I couldn't load your credentials. Did you specify your keyfile?")
+        sys.exit(ERRSTR + 'Stopping execution!')
+
     #startLogger()
     print('Getting client using ' + API_KEY)
     client = FCMNotification(api_key=API_KEY)
@@ -88,25 +107,13 @@ def main():
     # here we're checking which advisory IDs we've already seen, 
     # so we don't send multiple notifications for the same advisory
     # TODO: refactor into functions writeMemory(checkeIDs), readMemory()
-    try:
-        with open(MEMORY_PATH, 'r') as memFile:
-            checkedIDs = memFile.read() 
-            memFile.close()
-    except IOError:
-        # this most likely means file not found. this can happen during the first run
-        print(ERRSTR + 'Error reading memory file!')
-        print(ERRSTR + 'Continuing without list of checked IDs...')
-        checkedIDs = ''
-    except:
-        e = sys.exc_info()[0]
-        print('An unknown error occured!')
-        print(e)
+    checkedIDs = readFile(MEMORY_PATH)
     for result in results:
         if result.risk > 3:
             # here we're checking if the is related to our programs
             for prog in PROGRAMS:
                 if re.search(prog, result.description, re.IGNORECASE):
-                    if result.identifier not in checkedIDs:
+                    if ( len(checkedIDs) == 0 ) or ( result.identifier not in checkedIDs ):
                         #this means we have found an alert that we have not seen before! lets alert the user...
                         for key in USER_KEYS:
                             try:
