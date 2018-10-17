@@ -106,7 +106,6 @@ def main():
         results.append(x)
     # here we're checking which advisory IDs we've already seen, 
     # so we don't send multiple notifications for the same advisory
-    # TODO: refactor into functions writeMemory(checkeIDs), readMemory()
     checkedIDs = readFile(MEMORY_PATH)
     for result in results:
         if result.risk > 3:
